@@ -65,8 +65,35 @@ app.get('/api/tenants/:customerId', (req, res) => {
   res.json(tenant);
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Onboarding API server running at http://localhost:${PORT}`);
-  console.log(`   Health check: http://localhost:${PORT}/api/health`);
+const VALID_STEP_STATUSES = ['pending', 'in_progress', 'completed', 'failed'];
+
+// Update a single onboarding step's status for a customer
+app.patch('/api/customers/:id/onboarding/steps/:stepId', (req, res) => {
+  const { id, stepId } = req.params;
+  const { status } = req.body;
+
+  if (!VALID_STEP_STATUSES.includes(status)) {
+    return res.status(400).json({ error: `Invalid status: ${status}` });
+  }
+
+  const outcome = store.updateOnboardingStepStatus(id, stepId, status);
+
+  if (outcome.result === 'customer_not_found') {
+    return res.status(404).json({ error: 'Customer not found' });
+  }
+  if (outcome.result === 'step_not_found') {
+    return res.status(404).json({ error: 'Step not found' });
+  }
+
+  res.json(outcome.state);
 });
+
+// Start server only when run directly (not when required by tests)
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Onboarding API server running at http://localhost:${PORT}`);
+    console.log(`   Health check: http://localhost:${PORT}/api/health`);
+  });
+}
+
+module.exports = app;
