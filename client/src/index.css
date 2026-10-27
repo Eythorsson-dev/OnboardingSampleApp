@@ -152,6 +152,27 @@ header p {
   color: white;
 }
 
+.step-status.failed {
+  background: #dc2626;
+  color: white;
+}
+
+.step-status-select {
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: #374151;
+  padding: 4px 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  background: white;
+}
+
+.update-error {
+  margin-top: 12px;
+  color: #dc2626;
+  font-size: 0.85rem;
+}
+
 .customer-card {
   border: 1px solid #e5e7eb;
   border-radius: 8px;

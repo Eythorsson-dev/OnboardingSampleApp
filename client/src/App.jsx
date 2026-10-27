@@ -8,6 +8,8 @@ const TABS = [
   { id: 'import', label: 'Import' }
 ];
 
+const STEP_STATUSES = ['pending', 'in_progress', 'completed', 'failed'];
+
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [onboardingData, setOnboardingData] = useState([]);
@@ -35,6 +37,16 @@ function App() {
       });
   }, []);
 
+  const handleStepUpdate = (customerId, updated) => {
+    setOnboardingData(prev =>
+      prev.map(item =>
+        item.customerId === customerId
+          ? { ...item, steps: updated.steps, progressPercent: updated.progressPercent }
+          : item
+      )
+    );
+  };
+
   return (
     <div className="app">
       <header>
@@ -56,7 +68,12 @@ function App() {
 
       <main className="content">
         {activeTab === 'dashboard' && (
-          <DashboardTab data={onboardingData} loading={loading} error={error} />
+          <DashboardTab
+            data={onboardingData}
+            loading={loading}
+            error={error}
+            onStepUpdate={handleStepUpdate}
+          />
         )}
         {activeTab === 'customer-info' && (
           <PlaceholderTab title="Customer Info" description="Collect and validate customer information" />
@@ -75,7 +92,7 @@ function App() {
   );
 }
 
-function DashboardTab({ data, loading, error }) {
+function DashboardTab({ data, loading, error, onStepUpdate }) {
   if (loading) {
     return <div className="placeholder"><p>Loading...</p></div>;
   }
@@ -101,19 +118,45 @@ function DashboardTab({ data, loading, error }) {
       </p>
 
       {data.map(item => (
-        <div key={item.customerId} className="customer-card">
-          <h3>{item.customerName}</h3>
-          <div className="customer-meta">
-            <span>📍 {item.customerRegion}</span>
-            <span>🏭 {item.customerIndustry}</span>
-          </div>
-
-          <div className="progress-section">
-            <ProgressBar percent={item.progressPercent} />
-            <Checklist steps={item.steps} />
-          </div>
-        </div>
+        <CustomerCard key={item.customerId} item={item} onStepUpdate={onStepUpdate} />
       ))}
+    </div>
+  );
+}
+
+function CustomerCard({ item, onStepUpdate }) {
+  const [updateError, setUpdateError] = useState(null);
+
+  const handleStatusChange = async (stepId, status) => {
+    setUpdateError(null);
+    try {
+      const res = await fetch(`/api/customers/${item.customerId}/onboarding/steps/${stepId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      onStepUpdate(item.customerId, body);
+    } catch (err) {
+      setUpdateError(err.message);
+    }
+  };
+
+  return (
+    <div className="customer-card">
+      <h3>{item.customerName}</h3>
+      <div className="customer-meta">
+        <span>📍 {item.customerRegion}</span>
+        <span>🏭 {item.customerIndustry}</span>
+      </div>
+
+      <div className="progress-section">
+        <ProgressBar percent={item.progressPercent} />
+        <Checklist steps={item.steps} onStatusChange={handleStatusChange} />
+      </div>
+
+      {updateError && <p className="update-error">⚠️ {updateError}</p>}
     </div>
   );
 }
@@ -131,7 +174,7 @@ function ProgressBar({ percent }) {
   );
 }
 
-function Checklist({ steps }) {
+function Checklist({ steps, onStatusChange }) {
   return (
     <ul className="checklist">
       {steps.map(step => (
@@ -140,9 +183,18 @@ function Checklist({ steps }) {
             {step.status === 'completed' ? '✓' : step.order}
           </span>
           <span>{step.name}</span>
-          <span style={{ marginLeft: 'auto', fontSize: '0.85rem', color: '#9ca3af' }}>
-            {step.status.replace('_', ' ')}
-          </span>
+          <select
+            className="step-status-select"
+            value={step.status}
+            aria-label={`Status for ${step.name}`}
+            onChange={(e) => onStatusChange(step.id, e.target.value)}
+          >
+            {STEP_STATUSES.map(status => (
+              <option key={status} value={status}>
+                {status.replace('_', ' ')}
+              </option>
+            ))}
+          </select>
         </li>
       ))}
     </ul>
